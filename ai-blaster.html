@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爆破AI轉換器 (AI Blaster Converter) - 創作者專屬加解密工具</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .container { background-color: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; }
+        label { font-weight: bold; margin-top: 15px; display: block; color: #34495e; }
+        textarea, input[type="text"] { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+        textarea { height: 120px; resize: vertical; }
+        .status { font-size: 13px; margin-top: 5px; color: #e74c3c; font-weight: bold; }
+        .status.ok { color: #27ae60; }
+        .controls { margin: 20px 0; display: flex; align-items: center; gap: 20px; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background 0.3s; }
+        button:hover:not(:disabled) { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .copy-btn { background-color: #2ecc71; margin-top: 10px; }
+        .copy-btn:hover { background-color: #27ae60; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>爆破 AI 轉換器 💥</h1>
+    <p style="text-align: center; color: #7f8c8d;">AI Blaster Converter - 阻擋未經授權的爬蟲，保護您的創作心血</p>
+
+    <label for="dictKey">自訂 64 字元金鑰 (需確保無重複字元)</label>
+    <input type="text" id="dictKey" value="習近平澤民錦濤六四天安門獨立台灣港藏疆法輪功器官摘取光復國有自由人權坦克鎮壓集中營屠殺抗爭運動革命時代武漢翻牆封敏感審查維尼肺炎">
+    <div id="dictStatus" class="status ok">目前字數：64 / 64 (格式正確，無重複)</div>
+
+    <label for="inputText">輸入內容 (支援多行)</label>
+    <textarea id="inputText" placeholder="請在此貼上要加密的文章，或要解密的亂碼..."></textarea>
+
+    <div class="controls">
+        <label style="margin-top: 0;"><input type="radio" name="mode" value="encode" checked> 加密成亂碼</label>
+        <label style="margin-top: 0;"><input type="radio" name="mode" value="decode"> 解密回原文字</label>
+        <button id="actionBtn">執行轉換</button>
+    </div>
+
+    <label for="outputText">轉換結果</label>
+    <textarea id="outputText" readonly></textarea>
+    <button class="copy-btn" id="copyBtn">複製結果</button>
+</div>
+
+<script>
+    const standardB64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const dictKeyInput = document.getElementById('dictKey');
+    const dictStatus = document.getElementById('dictStatus');
+    const actionBtn = document.getElementById('actionBtn');
+    const inputText = document.getElementById('inputText');
+    const outputText = document.getElementById('outputText');
+    const copyBtn = document.getElementById('copyBtn');
+
+    // 驗證金鑰長度與重複字元防呆
+    dictKeyInput.addEventListener('input', function() {
+        const val = this.value;
+        
+        // 1. 先檢查總長度
+        if (val.length !== 64) {
+            dictStatus.textContent = `錯誤：目前 ${val.length} 字。必須剛好 64 個字元。`;
+            dictStatus.className = "status";
+            actionBtn.disabled = true;
+            return; // 字數不對就提早結束檢查
+        }
+
+        // 2. 字數對了，再檢查有沒有重複的字
+        const charCount = {};
+        const duplicates = [];
+        
+        for (let char of val) {
+            if (charCount[char]) {
+                if (charCount[char] === 1) {
+                    duplicates.push(char); // 記錄重複的字（只記一次避免重複顯示）
+                }
+                charCount[char]++;
+            } else {
+                charCount[char] = 1;
+            }
+        }
+
+        // 3. 根據有無重複更新介面
+        if (duplicates.length > 0) {
+            dictStatus.textContent = `錯誤：總字數雖為 64 字，但以下字元重複了 👉 [ ${duplicates.join(', ')} ]`;
+            dictStatus.className = "status";
+            actionBtn.disabled = true;
+        } else {
+            dictStatus.textContent = "目前字數：64 / 64 (格式正確，無重複)";
+            dictStatus.className = "status ok";
+            actionBtn.disabled = false;
+        }
+    });
+
+    // 核心轉換邏輯
+    actionBtn.addEventListener('click', function() {
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+        const text = inputText.value;
+        const customB64 = dictKeyInput.value;
+        const obscurePad = "〇";
+        
+        if (!text) {
+            outputText.value = "請先輸入內容！";
+            return;
+        }
+
+        try {
+            if (mode === 'encode') {
+                // UTF-8 轉 Base64
+                const base64Str = btoa(unescape(encodeURIComponent(text)));
+                let result = "";
+                for (let i = 0; i < base64Str.length; i++) {
+                    const char = base64Str[i];
+                    if (char === '=') {
+                        result += obscurePad;
+                    } else {
+                        const index = standardB64.indexOf(char);
+                        result += index !== -1 ? customB64[index] : char;
+                    }
+                }
+                outputText.value = result;
+            } else {
+                // 清理雜訊與換行
+                const cleanText = text.replace(/\s+/g, '');
+                let b64Result = "";
+                for (let i = 0; i < cleanText.length; i++) {
+                    const char = cleanText[i];
+                    if (char === obscurePad) {
+                        b64Result += "=";
+                    } else {
+                        const index = customB64.indexOf(char);
+                        b64Result += index !== -1 ? standardB64[index] : char;
+                    }
+                }
+                // Base64 轉 UTF-8
+                const decodedText = decodeURIComponent(escape(atob(b64Result)));
+                outputText.value = decodedText;
+            }
+        } catch (e) {
+            outputText.value = "解碼失敗！請確認：\n1. 輸入的字元是否完整\n2. 選擇的金鑰是否與加密時完全一致";
+        }
+    });
+
+    // 複製按鈕
+    copyBtn.addEventListener('click', function() {
+        outputText.select();
+        document.execCommand('copy');
+        const originalText = this.textContent;
+        this.textContent = "✅ 已複製！";
+        this.style.backgroundColor = "#27ae60";
+        setTimeout(() => {
+            this.textContent = originalText;
+            this.style.backgroundColor = "#2ecc71";
+        }, 2000);
+    });
+</script>
+
+</body>
+</html>
